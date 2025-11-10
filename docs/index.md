@@ -161,6 +161,8 @@ The `host` argument configures the endpoint that the Terraform Provider for Data
 
 ## Authentication
 
+-> **Note** For a comprehensive guide on modern authentication practices using Databricks CLI profiles and unified authentication, see the [Unified Authentication guide](guides/unified-auth.md). This is the recommended approach for most use cases.
+
 There are currently a number of supported methods to [authenticate](https://docs.databricks.com/dev-tools/api/latest/authentication.html) into the Databricks platform to create resources:
 
 * (recommended for CI/CD) [OpenID Connect](#authenticating-with-github-openid-connect-oidc)

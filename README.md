@@ -5,6 +5,7 @@
 [AWS](docs/guides/aws-workspace.md) tutorial
 | [Azure](docs/guides/azure-workspace.md) tutorial
 | [End-to-end](docs/guides/workspace-management.md) tutorial
+| [Unified Authentication](docs/guides/unified-auth.md)
 | [Authentication](docs/index.md)
 | [Troubleshooting Guide](docs/guides/troubleshooting.md)
 | [Changelog](CHANGELOG.md)

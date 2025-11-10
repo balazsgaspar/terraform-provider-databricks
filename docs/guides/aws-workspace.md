@@ -12,6 +12,8 @@ You can provision multiple Databricks workspaces with Terraform.
 
 ## Provider initialization for AWS workspaces
 
+-> **Note** This guide shows OAuth authentication with service principals. For a modern approach using Databricks CLI profiles and unified authentication, see the [Unified Authentication guide](unified-auth.md), which is recommended for most use cases.
+
 This guide assumes you have the `client_id`, which is the `application_id` of the [Service Principal](../resources/service_principal.md), `client_secret`, which is its secret, and `databricks_account_id`, which can be found in the top right corner of the [Account Console](https://accounts.cloud.databricks.com). (see [instruction](https://docs.databricks.com/dev-tools/authentication-oauth.html#step-2-create-an-oauth-secret-for-a-service-principal)). This guide is provided as is and assumes you will use it as the basis for your setup.
 
 ```hcl
@@ -299,6 +301,8 @@ data "databricks_current_user" "me" {
 
 In [the next step](workspace-management.md), please use the following configuration for the provider:
 
+**Option 1: OAuth with Service Principal (shown in this guide):**
+
 ```hcl
 provider "databricks" {
   host          = module.e2.workspace_url
@@ -306,6 +310,17 @@ provider "databricks" {
   client_secret = var.client_secret
 }
 ```
+
+**Option 2: Unified Authentication with CLI profiles (recommended):**
+
+```hcl
+provider "databricks" {
+  profile = "my-workspace"
+  # Or use auth_type = "databricks-cli" to use DEFAULT profile
+}
+```
+
+See the [Unified Authentication guide](unified-auth.md) for details on setting up CLI profiles.
 
 We assume that you have a terraform module in your project that creates a workspace (using [Databricks Workspace](#databricks-workspace) section) and you named it as `e2` while calling it in the **main.tf** file of your terraform project and `workspace_url` is the output attribute of that module. This provider configuration will allow you to authenticate to the created workspace after workspace creation.
 
