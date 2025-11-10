@@ -10,7 +10,7 @@ Databricks unified authentication provides a consistent authentication experienc
 
 ## Overview
 
-Unified authentication uses the Databricks CLI to manage credentials securely, storing them in `~/.databrickscfg`. The Terraform provider can then reference these credentials through named profiles, eliminating the need to hardcode credentials in your Terraform configuration.
+Unified authentication uses the Databricks CLI to manage credentials securely, storing them in `~/.databrickscfg`. The Terraform provider can then reference these credentials through named profiles, eliminating the need to manually generate access tokents or hardcode credentials in your Terraform configuration.
 
 **Benefits:**
 - **Centralized credential management**: Configure authentication once, use everywhere
