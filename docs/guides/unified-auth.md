@@ -21,11 +21,12 @@ Unified authentication uses the Databricks CLI to manage credentials securely, s
 
 ## Prerequisites
 
-- Databricks CLI version 0.213.0 or later ([installation instructions](https://docs.databricks.com/en/dev-tools/cli/install.html))
+- Databricks CLI version 0.205 or later ([installation instructions](https://docs.databricks.com/en/dev-tools/cli/install.html))
 - Terraform 1.1.5 or later
 - Access to a Databricks workspace or account
 
 ## Setting Up Authentication
+The steps below are an example for 
 
 ### Step 1: Install and Configure Databricks CLI
 
@@ -33,7 +34,8 @@ Install the Databricks CLI:
 
 ```bash
 # macOS (Homebrew)
-brew install databricks/tap/databricks
+brew tap databricks/tap
+brew install databricks
 
 # Linux/macOS (curl)
 curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
@@ -52,18 +54,19 @@ databricks --version
 
 #### For Workspace-Level Access
 
-Configure a profile for your workspace using OAuth (recommended):
+Configure a profile for your workspace using OAuth (recommended). For the host parameter, use the base URL of the workspace from your browser.
 
 ```bash
 databricks auth login --host https://your-workspace.cloud.databricks.com
 ```
+When prompted, provide a name for the authentication profile. Replace my-workspace in the examples below with your actual workspace profile name.
 
 This will:
 1. Open your browser for OAuth authentication
 2. Create a profile in `~/.databrickscfg`
 3. Store OAuth refresh tokens securely
 
-Alternatively, configure manually with a Personal Access Token (PAT):
+Alternatively, you can manually configure a Personal Access Token ([legacy](https://docs.databricks.com/aws/en/dev-tools/auth/pat)):
 
 ```bash
 databricks configure --profile my-workspace
@@ -81,10 +84,13 @@ databricks auth login \
   --account-id <your-account-id>
 ```
 
-Or configure manually:
+When prompted, provide a name for the authentication profile. Replace my-account in the examples below with your actual account profile name.
+
+
+Or configure a PAT token ([legacy](https://docs.databricks.com/aws/en/dev-tools/auth/pat)):
 
 ```bash
-databricks configure --profile account --host https://accounts.cloud.databricks.com
+databricks configure --profile my-account --host https://accounts.cloud.databricks.com
 ```
 
 ### Step 3: Verify Configuration
@@ -102,7 +108,7 @@ Example configuration:
 host     = https://your-workspace.cloud.databricks.com
 auth_type = databricks-cli
 
-[account]
+[my-account]
 host       = https://accounts.cloud.databricks.com
 account_id = 12345678-1234-1234-1234-123456789012
 auth_type  = databricks-cli
@@ -112,10 +118,16 @@ host      = https://your-workspace.cloud.databricks.com
 auth_type = databricks-cli
 ```
 
-Test the connection:
+Test the connection to the workspace endpoint:
 
 ```bash
-databricks current-user me --profile DEFAULT
+databricks current-user me --profile my-workspace
+```
+
+Test the connection to the account endpoint (replace <user-id> with the ID returned by the previous command):
+
+```bash
+databricks account users-v2 get <user-id>
 ```
 
 ## Using with Terraform Provider
@@ -135,13 +147,13 @@ terraform {
 
 # Workspace-level provider
 provider "databricks" {
-  profile = "DEFAULT"
+  profile = "my-workspace"
 }
 
-# Account-level provider for workspace provisioning
+# Account-level provider
 provider "databricks" {
   alias   = "mws"
-  profile = "account"
+  profile = "my-account"
 }
 ```
 
@@ -169,133 +181,18 @@ Set the profile via environment variable:
 
 ```bash
 export DATABRICKS_CONFIG_PROFILE="my-workspace"
-terraform plan
 ```
 
 Or specify auth type:
 
 ```bash
 export DATABRICKS_AUTH_TYPE="databricks-cli"
-terraform plan
-```
-
-## Complete Example: Provisioning a Workspace
-
-This example demonstrates using unified authentication to provision an AWS Databricks workspace.
-
-**Directory structure:**
-```
-terraform-project/
-├── main.tf
-├── providers.tf
-├── variables.tf
-└── terraform.tfvars
-```
-
-**providers.tf:**
-
-```hcl
-terraform {
-  required_providers {
-    databricks = {
-      source = "databricks/databricks"
-    }
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.region
-}
-
-# Account-level provider for creating workspace
-provider "databricks" {
-  alias   = "mws"
-  profile = "account"
-}
-```
-
-**variables.tf:**
-
-```hcl
-variable "databricks_account_id" {
-  description = "Databricks account ID"
-  type        = string
-}
-
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-west-2"
-}
-
-variable "prefix" {
-  description = "Prefix for resource names"
-  type        = string
-  default     = "my-workspace"
-}
-```
-
-**main.tf:**
-
-```hcl
-# Cross-account IAM role for Databricks
-data "databricks_aws_assume_role_policy" "this" {
-  provider    = databricks.mws
-  external_id = var.databricks_account_id
-}
-
-resource "aws_iam_role" "cross_account_role" {
-  name               = "${var.prefix}-crossaccount"
-  assume_role_policy = data.databricks_aws_assume_role_policy.this.json
-}
-
-data "databricks_aws_crossaccount_policy" "this" {
-  provider = databricks.mws
-}
-
-resource "aws_iam_role_policy" "this" {
-  name   = "${var.prefix}-policy"
-  role   = aws_iam_role.cross_account_role.id
-  policy = data.databricks_aws_crossaccount_policy.this.json
-}
-
-resource "databricks_mws_credentials" "this" {
-  provider         = databricks.mws
-  role_arn         = aws_iam_role.cross_account_role.arn
-  credentials_name = "${var.prefix}-creds"
-}
-
-# Create workspace (simplified example)
-resource "databricks_mws_workspaces" "this" {
-  provider       = databricks.mws
-  account_id     = var.databricks_account_id
-  workspace_name = var.prefix
-  aws_region     = var.region
-
-  credentials_id = databricks_mws_credentials.this.credentials_id
-  # storage_configuration_id and network_id would be defined separately
-}
-
-output "workspace_url" {
-  value = databricks_mws_workspaces.this.workspace_url
-}
-```
-
-Run Terraform:
-
-```bash
-terraform init
-terraform plan
-terraform apply
 ```
 
 ## Authentication for Service Principals (CI/CD)
 
-For automated pipelines, use OAuth machine-to-machine (M2M) authentication with service principals.
+For automated pipelines, use [OAuth machine-to-machine (M2M) authentication](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m) with service principals.
+Use this method for deployments managed via automated CI/CD pipelines. Make sure that 
 
 ### Step 1: Create Service Principal
 
@@ -304,6 +201,8 @@ databricks service-principals create --display-name "terraform-automation"
 ```
 
 ### Step 2: Generate OAuth Secret
+
+Replace <service-principal-id> with the ID returned by the previous create command.
 
 ```bash
 databricks service-principals create-secret --id <service-principal-id>
@@ -397,100 +296,13 @@ provider "databricks" {
 }
 ```
 
-## Troubleshooting
-
-### Error: cannot configure default credentials
-
-**Cause:** No valid authentication found.
-
-**Solution:**
-1. Verify `~/.databrickscfg` exists and contains valid profiles
-2. Check the profile name matches: `databricks profiles list`
-3. Ensure the profile has valid credentials: `databricks auth login`
-
-### Error: databricks-cli auth: cannot get access token
-
-**Cause:** OAuth tokens expired or invalid.
-
-**Solution:**
-```bash
-# Re-authenticate
-databricks auth login --profile <profile-name>
-```
-
-### Error: More than one authorization method configured
-
-**Cause:** Multiple authentication methods specified (e.g., both `profile` and explicit `token`).
-
-**Solution:** Remove conflicting authentication configurations. Use only one method:
-
-```hcl
-# Good - single method
-provider "databricks" {
-  profile = "my-workspace"
-}
-
-# Bad - conflicting methods
-provider "databricks" {
-  profile = "my-workspace"
-  token   = "dapi..."  # Remove this!
-}
-```
-
-### Verify Active Authentication
-
-Check which credentials are being used:
-
-```bash
-# Check CLI configuration
-databricks auth env
-
-# Test connection
-databricks current-user me --profile my-workspace
-
-# Enable Terraform debug logging
-export TF_LOG=DEBUG
-terraform plan
-```
-
-## Migration from Legacy Authentication
-
-If you're currently using explicit credentials in Terraform, migrate to unified authentication:
-
-### Before (Legacy):
-
-```hcl
-provider "databricks" {
-  host  = "https://workspace.cloud.databricks.com"
-  token = var.databricks_token  # Don't do this!
-}
-```
-
-### After (Unified Authentication):
-
-1. Configure CLI profile:
-```bash
-databricks auth login --host https://workspace.cloud.databricks.com
-```
-
-2. Update Terraform:
-```hcl
-provider "databricks" {
-  profile = "DEFAULT"
-  # Or simply:
-  # auth_type = "databricks-cli"
-}
-```
-
-3. Remove credential variables from `variables.tf` and `terraform.tfvars`
-
 ## Related Resources
 
-- [Databricks Unified Authentication Documentation](https://docs.databricks.com/en/dev-tools/auth/unified-auth.html)
-- [Databricks CLI Documentation](https://docs.databricks.com/en/dev-tools/cli/index.html)
-- [Databricks CLI Profiles](https://docs.databricks.com/en/dev-tools/cli/profiles.html)
 - [Terraform Provider Authentication](../index.md#authentication)
 - [Provisioning AWS Databricks workspace](aws-workspace.md)
 - [Provisioning Azure Databricks workspace](azure-workspace.md)
+- [Databricks Unified Authentication Documentation](https://docs.databricks.com/en/dev-tools/auth/unified-auth.html)
+- [Databricks CLI Documentation](https://docs.databricks.com/en/dev-tools/cli/index.html)
+- [Databricks CLI Profiles](https://docs.databricks.com/en/dev-tools/cli/profiles.html)
 - [OAuth Machine-to-Machine (M2M) Authentication](https://docs.databricks.com/en/dev-tools/auth/oauth-m2m.html)
 
