@@ -145,15 +145,16 @@ terraform {
   }
 }
 
-# Workspace-level provider
-provider "databricks" {
-  profile = "my-workspace"
-}
-
 # Account-level provider
 provider "databricks" {
   alias   = "mws"
   profile = "my-account"
+}
+
+# Workspace-level provider
+provider "databricks" {
+  alias = "workspace"
+  profile = "my-workspace"
 }
 ```
 
